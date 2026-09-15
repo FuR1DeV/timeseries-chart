@@ -29,6 +29,7 @@ export const DEFAULT_OPTIONS = {
   colors: DEFAULT_COLORS,
   categories: undefined,
   xFormat: 'dd.mm.yyyy',
+  useUTC: false,
   yAxis: {
     alignTicks: true,
     tickPixelInterval: 72,
@@ -146,7 +147,7 @@ export class TimeSeriesChart {
    * @param {boolean} [animate=false]
    */
   setData(data, animate = false) {
-    const series = this.userOptions.series.map((s, i) => (data[i] ? { ...s, data: data[i] } : s));
+    const series = (this.userOptions.series || []).map((s, i) => (data[i] ? { ...s, data: data[i] } : s));
     this.update({ series }, animate);
   }
 
@@ -205,7 +206,7 @@ export class TimeSeriesChart {
   prepareData() {
     const o = this.options;
     const rawSeries = o.series || [];
-    const fmtX = typeof o.xFormat === 'function' ? o.xFormat : (x) => formatX(x, o.xFormat);
+    const fmtX = typeof o.xFormat === 'function' ? o.xFormat : (x) => formatX(x, o.xFormat, o.useUTC);
 
     /** @type {string[]} */
     let categories;
@@ -222,7 +223,7 @@ export class TimeSeriesChart {
       for (const s of rawSeries) {
         (s.data || []).forEach((item, i) => {
           const x = pointX(item, i);
-          const key = x instanceof Date ? x.getTime() : x;
+          const key = xKey(x);
           if (typeof key !== 'number') numeric = false;
           if (!keys.has(key)) keys.set(key, x);
         });
@@ -235,7 +236,7 @@ export class TimeSeriesChart {
         const arr = new Array(ordered.length).fill(null);
         (s.data || []).forEach((item, i) => {
           const x = pointX(item, i);
-          const key = x instanceof Date ? x.getTime() : x;
+          const key = xKey(x);
           arr[indexOf.get(key)] = toY(pointY(item));
         });
         return arr;
@@ -778,16 +779,48 @@ function toY(v) {
 }
 
 /**
+ * Canonical key of an x value, so that a Date, a timestamp and an ISO string
+ * describing the same moment collapse into one category.
+ * @param {unknown} x
+ */
+function xKey(x) {
+  if (x instanceof Date) return x.getTime();
+  if (typeof x === 'number') return x;
+  if (typeof x === 'string') {
+    const d = parseDateString(x);
+    if (d) return d.getTime();
+  }
+  return x;
+}
+
+const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * 'YYYY-MM-DD' → calendar date (local, timezone-safe); full ISO date-time → Date; otherwise null.
+ * @param {string} x
+ */
+function parseDateString(x) {
+  const m = DATE_ONLY.exec(x);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  if (/^\d{4}-\d{2}-\d{2}[T ]/.test(x)) {
+    const d = new Date(x);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  return null;
+}
+
+/**
  * Category label: dates → dd.mm.yyyy, everything else → string.
  * @param {unknown} x
  * @param {string} format
+ * @param {boolean} utc  format Date objects / timestamps in UTC instead of local time
  */
-function formatX(x, format) {
-  if (x instanceof Date) return formatDate(x, format);
-  if (typeof x === 'number' && x > 1e11) return formatDate(x, format); // looks like a timestamp
-  if (typeof x === 'string' && /^\d{4}-\d{2}-\d{2}/.test(x)) {
-    const d = new Date(x);
-    if (!isNaN(d.getTime())) return formatDate(d, format);
+function formatX(x, format, utc) {
+  if (x instanceof Date) return formatDate(x, format, utc);
+  if (typeof x === 'number' && Math.abs(x) > 1e11) return formatDate(x, format, utc); // looks like a ms timestamp
+  if (typeof x === 'string') {
+    const d = parseDateString(x);
+    if (d) return formatDate(d, format, DATE_ONLY.test(x) ? false : utc);
   }
   return String(x);
 }

@@ -79,8 +79,10 @@ export function computeAxis(dataMin, dataMax, opts) {
   let min = dataMin;
   let max = dataMax;
 
+  let flat = false;
   if (min === max) {
-    // flat data: give it some room (Highcharts shows 0..1 for all-zero data)
+    // flat data: give it some room (0..1 for all-zero data), no extra padding
+    flat = true;
     if (min === 0) max = 1;
     else {
       min = min > 0 ? 0 : min * 1.05;
@@ -89,8 +91,8 @@ export function computeAxis(dataMin, dataMax, opts) {
   }
 
   const length = max - min;
-  if (opts.min == null && !(softThreshold && dataMin === threshold && threshold === min)) min -= length * minPadding;
-  if (opts.max == null && !(softThreshold && dataMax === threshold && threshold === max)) max += length * maxPadding;
+  if (!flat && opts.min == null && !(softThreshold && dataMin === threshold && threshold === min)) min -= length * minPadding;
+  if (!flat && opts.max == null && !(softThreshold && dataMax === threshold && threshold === max)) max += length * maxPadding;
   if (opts.min != null) min = opts.min;
   if (opts.max != null) max = opts.max;
 

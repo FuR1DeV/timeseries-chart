@@ -126,6 +126,8 @@ export interface ChartOptions {
   categories?: Array<string | number | Date>;
   /** Date format for x labels ("dd.mm.yyyy") or a custom function. */
   xFormat?: string | ((x: unknown) => string);
+  /** Format Date objects / timestamps in UTC (default false = local time). 'YYYY-MM-DD' strings are always timezone-safe. */
+  useUTC?: boolean;
   yAxis?: YAxisDefaults;
   /** Per-axis overrides keyed by `series.yAxis`. */
   yAxes?: Record<string | number, YAxisOptions>;
@@ -169,4 +171,4 @@ export function computeAxis(
 export function normalizeTickInterval(interval: number, hasTickAmount: boolean): number;
 export function splinePath(points: Array<{ x: number; y: number } | null>): string;
 export function formatNumber(value: number, decimals?: number, decimalPoint?: string, thousandsSep?: string): string;
-export function formatDate(date: Date | number, format?: string): string;
+export function formatDate(date: Date | number, format?: string, utc?: boolean): string;

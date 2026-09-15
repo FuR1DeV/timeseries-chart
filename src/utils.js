@@ -122,17 +122,23 @@ const pad2 = (n) => (n < 10 ? '0' : '') + n;
  * Tokens: dd, mm, yyyy, yy, HH, MM.
  * @param {Date|number} date
  * @param {string} [format]
+ * @param {boolean} [utc]  use UTC instead of local time
  */
-export function formatDate(date, format = 'dd.mm.yyyy') {
+export function formatDate(date, format = 'dd.mm.yyyy', utc = false) {
   const d = date instanceof Date ? date : new Date(date);
   if (isNaN(d.getTime())) return String(date);
+  const year = utc ? d.getUTCFullYear() : d.getFullYear();
+  const month = utc ? d.getUTCMonth() : d.getMonth();
+  const day = utc ? d.getUTCDate() : d.getDate();
+  const hours = utc ? d.getUTCHours() : d.getHours();
+  const minutes = utc ? d.getUTCMinutes() : d.getMinutes();
   return format
-    .replace('yyyy', String(d.getFullYear()))
-    .replace('yy', String(d.getFullYear()).slice(-2))
-    .replace('mm', pad2(d.getMonth() + 1))
-    .replace('dd', pad2(d.getDate()))
-    .replace('HH', pad2(d.getHours()))
-    .replace('MM', pad2(d.getMinutes()));
+    .replace('yyyy', String(year))
+    .replace('yy', String(year).slice(-2))
+    .replace('mm', pad2(month + 1))
+    .replace('dd', pad2(day))
+    .replace('HH', pad2(hours))
+    .replace('MM', pad2(minutes));
 }
 
 /** @param {unknown} v */
