@@ -160,9 +160,13 @@ export function Chart({ series }) {
   useEffect(() => {
     chart.current = new TimeSeriesChart(ref.current, { series });
     return () => chart.current.destroy();
-  }, []);
+  }, []); // создаём один раз
 
-  useEffect(() => { chart.current?.update({ series }); }, [series]);
+  const mounted = useRef(false);
+  useEffect(() => {
+    if (!mounted.current) { mounted.current = true; return; } // при монтировании уже отрисовано
+    chart.current?.update({ series });
+  }, [series]);
 
   return <div ref={ref} style={{ width: '100%', height: 300 }} />;
 }

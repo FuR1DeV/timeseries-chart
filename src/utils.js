@@ -61,9 +61,9 @@ export function animate(duration, easing, onFrame, onComplete) {
 export const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
 
 /**
- * Parse #rgb, #rrggbb, #rrggbbaa, rgb(), rgba() → [r, g, b, a].
+ * Parse #rgb, #rrggbb, #rrggbbaa, rgb(), rgba() → [r, g, b, a]; null for anything else (named colours, hsl…).
  * @param {string} color
- * @returns {[number, number, number, number]}
+ * @returns {[number, number, number, number] | null}
  */
 export function parseColor(color) {
   const c = String(color).trim();
@@ -81,7 +81,7 @@ export function parseColor(color) {
   }
   m = c.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+)\s*)?\)$/i);
   if (m) return [+m[1], +m[2], +m[3], m[4] === undefined ? 1 : +m[4]];
-  return [0, 0, 0, 1];
+  return null;
 }
 
 /**
@@ -90,7 +90,9 @@ export function parseColor(color) {
  * @param {number} alpha  e.g. 0.1 → lighter, -0.1 → darker
  */
 export function brighten(color, alpha) {
-  const [r, g, b, a] = parseColor(color);
+  const parsed = parseColor(color);
+  if (!parsed) return color; // unknown notation: leave it as is rather than guess
+  const [r, g, b, a] = parsed;
   const f = (v) => clamp(Math.round(v + alpha * 255), 0, 255);
   return `rgba(${f(r)},${f(g)},${f(b)},${a})`;
 }
@@ -151,6 +153,7 @@ export function merge(...sources) {
     if (!src) continue;
     for (const key of Object.keys(src)) {
       const val = src[key];
+      if (val === undefined) continue; // an explicit undefined never wipes a default
       if (isPlainObject(val) && isPlainObject(out[key])) out[key] = merge(out[key], val);
       else if (isPlainObject(val)) out[key] = merge(val);
       else out[key] = val;

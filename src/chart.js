@@ -11,8 +11,8 @@ export const DEFAULT_COLORS = ['#fef691', '#3870fe', '#0f8401', '#b500fe'];
 
 /** Per-type defaults. */
 export const TYPE_DEFAULTS = {
-  area: { lineWidth: 1, fillOpacity: 0.5, marker: { enabled: false, symbol: 'circle', radius: 3 } },
-  spline: { lineWidth: 3, marker: { enabled: false, symbol: 'circle', radius: 3 } },
+  area: { lineWidth: 1, fillOpacity: 0.5, marker: { enabled: undefined, symbol: 'circle', radius: 3 } },
+  spline: { lineWidth: 3, marker: { enabled: undefined, symbol: 'circle', radius: 3 } },
   line: { lineWidth: 1, marker: { enabled: true, symbol: 'square', radius: 3 } },
   bar: { borderWidth: 1, borderColor: '#ffffff', borderRadius: 3, pointPadding: 0.2, groupPadding: 0.2 },
 };
@@ -100,9 +100,18 @@ export class TimeSeriesChart {
     this.destroyed = false;
 
     el.classList.add('tsc-container');
+    // inner box = the chart's content area; the SVG and the tooltip live here,
+    // so padding / borders on the user's container do not shift anything
+    this.inner = document.createElement('div');
+    this.inner.className = 'tsc-inner';
     this.svg = document.createElementNS(SVG_NS, 'svg');
     this.svg.setAttribute('class', 'tsc-svg');
-    el.appendChild(this.svg);
+    // start at 0x0 so that an unsized container is measured as empty (→ default 600x400),
+    // not as the browser's default 300x150 SVG box
+    this.svg.setAttribute('width', '0');
+    this.svg.setAttribute('height', '0');
+    this.inner.appendChild(this.svg);
+    el.appendChild(this.inner);
 
     this.tooltip = this.options.tooltip.enabled ? new Tooltip(this, this.options.tooltip) : null;
 
@@ -137,7 +146,10 @@ export class TimeSeriesChart {
     this.userOptions = merge(this.userOptions, options);
     if (options.series) this.userOptions.series = options.series; // arrays are replaced, not merged
     this.options = merge(DEFAULT_OPTIONS, this.userOptions);
-    if (this.tooltip) this.tooltip.options = this.options.tooltip;
+    const wantTooltip = this.options.tooltip.enabled !== false;
+    if (wantTooltip && !this.tooltip) this.tooltip = new Tooltip(this, this.options.tooltip);
+    else if (!wantTooltip && this.tooltip) { this.tooltip.destroy(); this.tooltip = null; }
+    else if (this.tooltip) this.tooltip.options = this.options.tooltip;
     this.render(animate);
   }
 
@@ -174,17 +186,21 @@ export class TimeSeriesChart {
     el.removeEventListener('mouseleave', this.onPointerLeave);
     el.removeEventListener('touchend', this.onPointerLeave);
     if (this.tooltip) this.tooltip.destroy();
-    this.svg.remove();
+    this.inner.remove();
     el.classList.remove('tsc-container');
   }
 
   // ---------------------------------------------------------------- layout
 
+  /** Size of the container's content box (padding and border excluded); 600x400 when it has no size. */
   measure() {
     const o = this.options;
-    const rect = this.container.getBoundingClientRect();
-    const width = Math.max(1, Math.round(o.width || rect.width || this.container.clientWidth || 600));
-    const height = Math.max(1, Math.round(o.height || rect.height || this.container.clientHeight || 400));
+    const el = this.container;
+    const cs = getComputedStyle(el);
+    const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+    const padY = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+    const width = Math.max(1, Math.round(o.width || el.clientWidth - padX || 600));
+    const height = Math.max(1, Math.round(o.height || el.clientHeight - padY || 400));
     return { width, height };
   }
 
@@ -332,8 +348,6 @@ export class TimeSeriesChart {
     svg.setAttribute('width', String(this.chartWidth));
     svg.setAttribute('height', String(this.chartHeight));
     svg.setAttribute('viewBox', `0 0 ${this.chartWidth} ${this.chartHeight}`);
-    this.container.style.width = o.width ? `${o.width}px` : this.container.style.width;
-    this.container.style.height = o.height ? `${o.height}px` : this.container.style.height;
 
     // defs: clip rect for the initial animation / plot clipping
     const defs = svgEl('defs');
@@ -420,11 +434,13 @@ export class TimeSeriesChart {
     const markerGroup = svgEl('g', { class: 'tsc-markers' });
     group.appendChild(markerGroup);
     s.el.markerGroup = markerGroup;
+    // markers: explicit option, otherwise only when the series is a single point (nothing else to see)
+    s.showMarkers = conf.marker.enabled ?? pts.filter(Boolean).length <= 1;
     s.el.markers = pts.map((p) => {
       if (!p) return null;
       const m = conf.marker;
       const el = svgEl(m.symbol === 'square' ? 'rect' : 'circle', { class: 'tsc-marker', fill: m.fillColor || color });
-      if (!m.enabled) el.style.display = 'none';
+      if (!s.showMarkers) el.style.display = 'none';
       markerGroup.appendChild(el);
       this.applyMarkerState(s, el, p, false);
       return el;
@@ -487,17 +503,22 @@ export class TimeSeriesChart {
 
   /** Initial reveal: lines/areas are clipped from the left, bars grow from the baseline. */
   runInitialAnimation() {
-    const duration = (this.options.animation && this.options.animation.duration) || 1000;
+    const duration = this.options.animation?.duration ?? 1000;
     const plotWidth = this.plotWidth;
     this.clipRect.setAttribute('width', '0');
     const bars = this.series.filter((s) => s.type === 'bar');
+    const lines = this.series.filter((s) => s.type !== 'bar');
     for (const s of bars) s.el.barGroup.setAttribute('transform', `translate(0 ${s.baseline}) scale(1 0.001) translate(0 ${-s.baseline})`);
+    // markers are clipped together with the lines while they draw in
+    for (const s of lines) s.el.markerGroup.setAttribute('clip-path', `url(#${this.id}-clip)`);
 
     this.animations.push(animate(duration, easeInOutSine, (pos) => {
       this.clipRect.setAttribute('width', String(plotWidth * pos));
       for (const s of bars) {
         s.el.barGroup.setAttribute('transform', pos >= 1 ? '' : `translate(0 ${s.baseline}) scale(1 ${Math.max(pos, 0.001)}) translate(0 ${-s.baseline})`);
       }
+    }, () => {
+      for (const s of lines) s.el.markerGroup.removeAttribute('clip-path');
     }));
   }
 
@@ -550,7 +571,7 @@ export class TimeSeriesChart {
       if (prev >= 0 && s.el.markers[prev]) {
         const el = s.el.markers[prev];
         this.applyMarkerState(s, el, s.points[prev], false);
-        if (!s.conf.marker.enabled) el.style.display = 'none';
+        if (!s.showMarkers) el.style.display = 'none';
       }
       const p = index >= 0 ? s.points[index] : null;
       if (p) {
@@ -571,12 +592,15 @@ export class TimeSeriesChart {
         // shrink the halo away
         const h = s.el.halo;
         const from = +h.getAttribute('r') || 0;
+        if (s.haloAnim) s.haloAnim.cancel();
         s.haloAnim = animate(500, easeInOutSine, (pos) => h.setAttribute('r', String(from * (1 - pos))), () => {
           h.style.display = 'none';
         });
       }
       // series without a point at this x are "inactive"
-      s.el.group.classList.toggle('tsc-inactive', index >= 0 && !p);
+      const inactive = index >= 0 && !p;
+      s.el.group.classList.toggle('tsc-inactive', inactive);
+      s.el.group.style.opacity = inactive ? String(this.options.states.inactive?.opacity ?? 0.2) : '';
     }
   }
 
@@ -607,7 +631,10 @@ export class TimeSeriesChart {
     if (this.tooltip) this.tooltip.hide(immediate ? 0 : undefined);
     this.setHoverSeries(null);
     this.setPointState(-1);
-    for (const s of this.series || []) s.el.group?.classList.remove('tsc-inactive');
+    for (const s of this.series || []) {
+      s.el.group?.classList.remove('tsc-inactive');
+      if (s.el.group) s.el.group.style.opacity = '';
+    }
   }
 
   // ---------------------------------------------------------------- pointer
@@ -617,7 +644,7 @@ export class TimeSeriesChart {
     if (this.destroyed || !this.categories.length) return;
     const src = 'touches' in e ? e.touches[0] : e;
     if (!src) return;
-    const rect = this.container.getBoundingClientRect();
+    const rect = this.inner.getBoundingClientRect();
     const chartX = src.clientX - rect.left;
     const chartY = src.clientY - rect.top;
     this.runPointActions(chartX, chartY);
@@ -634,17 +661,17 @@ export class TimeSeriesChart {
    * @param {number} chartY
    */
   runPointActions(chartX, chartY) {
-    // nearest category by x
-    let index = 0;
+    // nearest category by x among those that have at least one point
+    let index = -1;
     let best = Infinity;
     this.xPositions.forEach((x, i) => {
       const d = Math.abs(x - chartX);
-      if (d < best) { best = d; index = i; }
+      if (d < best && this.series.some((s) => s.points[i])) { best = d; index = i; }
     });
+    if (index < 0) return;
 
     // points at that x
     const points = this.series.filter((s) => s.points[index]);
-    if (!points.length) return;
 
     // hovered series: nearest by distance; later series win ties (they are drawn on top)
     let hoverSeries = null;

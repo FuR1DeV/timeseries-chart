@@ -8,7 +8,7 @@ export type DataPoint =
   | { x: Date | number | string; y: number | null };
 
 export interface MarkerOptions {
-  /** Draw markers on every point (default: true for `line`, false for `area`/`spline` — they show on hover only). */
+  /** Draw markers on every point. Default: true for `line`; for `area`/`spline` only when the series is a single point (otherwise markers show on hover). */
   enabled?: boolean;
   symbol?: 'circle' | 'square';
   /** Marker radius in px (default 3). */
@@ -157,6 +157,17 @@ export class TimeSeriesChart {
   setSize(width: number, height: number): void;
   reflow(): void;
   destroy(): void;
+}
+
+/** The shared tooltip (exposed for customisation; normally used through `chart.tooltip`). */
+export class Tooltip {
+  constructor(chart: TimeSeriesChart, options: TooltipOptions);
+  readonly el: HTMLDivElement;
+  isHidden: boolean;
+  refresh(ctx: TooltipContext): void;
+  hide(delay?: number): void;
+  destroy(): void;
+  getPosition(boxWidth: number, boxHeight: number, anchorX: number, anchorY: number, len: number, negative: boolean): { x: number; y: number };
 }
 
 export const DEFAULT_OPTIONS: ChartOptions;

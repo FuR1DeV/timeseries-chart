@@ -95,6 +95,7 @@ export function computeAxis(dataMin, dataMax, opts) {
   if (!flat && opts.max == null && !(softThreshold && dataMax === threshold && threshold === max)) max += length * maxPadding;
   if (opts.min != null) min = opts.min;
   if (opts.max != null) max = opts.max;
+  if (!(max > min)) max = min + 1; // e.g. a hard min above the data
 
   // tick amount (only when aligning ticks between several axes)
   let tickAmount = opts.tickAmount;
@@ -113,6 +114,7 @@ export function computeAxis(dataMin, dataMax, opts) {
     const end = opts.max != null ? max : correctFloat(Math.ceil(max / interval) * interval);
     const ticks = [];
     for (let v = start, i = 0; v <= end + interval * 1e-9 && i < 1000; v = correctFloat(v + interval), i++) ticks.push(v);
+    if (!ticks.length) ticks.push(start);
     if (ticks[ticks.length - 1] < end) ticks.push(end);
     return ticks;
   };

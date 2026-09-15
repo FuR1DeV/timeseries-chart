@@ -9,7 +9,6 @@ export const CSS = `
 .tsc-container {
   position: relative;
   overflow: hidden;
-  box-sizing: border-box;
   font-family: "Helvetica Neue", Arial, sans-serif;
   font-size: 12px;
   line-height: normal;
@@ -18,7 +17,10 @@ export const CSS = `
   user-select: none;
   touch-action: pan-y;
 }
-.tsc-container > svg {
+.tsc-inner {
+  position: relative;
+}
+.tsc-inner > svg {
   display: block;
   overflow: visible;
 }

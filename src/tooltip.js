@@ -23,7 +23,7 @@ export class Tooltip {
     this.el = document.createElement('div');
     this.el.className = 'tsc-tooltip';
     this.el.setAttribute('role', 'tooltip');
-    chart.container.appendChild(this.el);
+    (chart.inner || chart.container).appendChild(this.el);
   }
 
   /**

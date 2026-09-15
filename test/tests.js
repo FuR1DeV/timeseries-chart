@@ -336,6 +336,86 @@ await test('destroy убирает SVG, тултип и обработчики; 
   t.host.remove();
 });
 
+// ---------------------------------------------------------------- robustness (review findings)
+
+await test('контейнер с padding и border: график занимает content box, курсор и тултип не смещены', async () => {
+  const host = document.createElement('div');
+  host.style.cssText = 'width:320px;height:180px;padding:10px;border:5px solid #999;box-sizing:content-box';
+  sandbox.appendChild(host);
+  const chart = new TimeSeriesChart(host, { animation: false, ...referenceOptions() });
+  assertEq([chart.chartWidth, chart.chartHeight], [320, 180], 'content box size');
+  const inner = host.querySelector('.tsc-inner').getBoundingClientRect();
+  host.dispatchEvent(new MouseEvent('mousemove', { clientX: inner.left + 96, clientY: inner.top + 90, bubbles: true }));
+  assertEq(chart.hoverIndex, 1, 'pointer maps to the second category (centre x = 96)');
+  assert(host.querySelector('.tsc-inner .tsc-tooltip'), 'tooltip lives inside the inner box');
+  await sleep(100); // ResizeObserver must not re-render in a loop
+  assertEq([chart.chartWidth, chart.chartHeight], [320, 180], 'size stable');
+  chart.destroy();
+  host.remove();
+});
+
+await test('контейнер без высоты, но с padding: размер по умолчанию, без бесконечного роста', async () => {
+  const host = document.createElement('div');
+  host.style.cssText = 'width:300px;padding:10px';
+  sandbox.appendChild(host);
+  const chart = new TimeSeriesChart(host, { animation: false, series: [{ type: 'line', data: [1, 2, 3] }] });
+  assertEq(chart.chartHeight, 400, 'default height');
+  await sleep(150);
+  assertEq([chart.chartWidth, chart.chartHeight, host.offsetHeight], [300, 400, 420], 'stable after ResizeObserver');
+  chart.destroy();
+  host.remove();
+});
+
+await test('явный undefined в опциях не затирает значения по умолчанию', () => {
+  const t = make({ spacing: undefined, colors: undefined, states: undefined, series: [{ type: 'line', data: [1, 2], marker: undefined }] });
+  assertEq([t.chart.plotLeft, t.chart.plotWidth], [0, 295], 'spacing default');
+  assertEq(t.chart.series[0].color, '#fef691', 'palette default');
+  assertEq(t.chart.series[0].el.markers[0].tagName, 'rect', 'marker default');
+  t.destroy();
+});
+
+await test('именованный цвет столбцов не превращается в чёрный при наведении', () => {
+  const t = make({ series: [{ type: 'bar', color: 'steelblue', data: [1, 2, 3] }, { type: 'line', data: [1, 2, 3] }] });
+  t.hover(t.chart.xPositions[1], 140);
+  assertEq(t.chart.series[0].el.bars[1].getAttribute('fill'), 'steelblue', 'unchanged colour');
+  t.destroy();
+});
+
+await test('категория, где у всех серий null, пропускается: выбирается ближайшая с данными', () => {
+  const t = make({ categories: ['a', 'b', 'c'], series: [{ type: 'line', data: [1, null, 3] }, { type: 'bar', data: [2, null, 1] }] });
+  t.hover(t.chart.xPositions[1] + 2, 50);
+  assertEq(t.chart.hoverIndex, 2, 'nearest category with data');
+  t.destroy();
+});
+
+await test('update({ tooltip: { enabled } }) включает и выключает тултип', () => {
+  const t = make({ series: [{ type: 'line', data: [1, 2] }] });
+  t.chart.update({ tooltip: { enabled: false } });
+  assert(t.chart.tooltip === null && !t.host.querySelector('.tsc-tooltip'), 'disabled');
+  t.hover(30, 50);
+  t.chart.update({ tooltip: { enabled: true } });
+  t.hover(30, 50);
+  assert(t.chart.tooltip && t.chart.tooltip.el.classList.contains('tsc-visible'), 're-enabled');
+  t.destroy();
+});
+
+await test('ручной min выше данных не ломает ось (нет NaN)', () => {
+  const a = computeAxis(0, 50, { plotHeight: 300, alignTicks: true, min: 100 });
+  assert(isFinite(a.min) && isFinite(a.max) && a.max > a.min, `finite extremes: ${a.min}..${a.max}`);
+  const t = make({ yAxes: { 0: { min: 100 } }, series: [{ type: 'line', data: [10, 20] }] });
+  assert(!t.chart.series[0].el.graph.getAttribute('d').includes('NaN'), 'path without NaN');
+  t.destroy();
+});
+
+await test('animation: { duration: 0 } рисует сразу; одиночная точка spline видна как маркер', () => {
+  const t = make({ animation: { duration: 0 }, series: [{ type: 'spline', data: [[1, 5]] }, { type: 'line', data: [[1, 2], [2, 3]] }] });
+  t.chart.update({}, true);
+  assertEq(+t.chart.clipRect.getAttribute('width'), t.chart.plotWidth, 'clip fully open at once');
+  assert(t.chart.series[0].el.markers[0].style.display === '', 'single-point series shows its marker');
+  assert(t.chart.series[1].el.markerGroup.getAttribute('clip-path') === null, 'marker clip removed after the animation');
+  t.destroy();
+});
+
 // ---------------------------------------------------------------- summary
 
 summary.textContent = failed ? `Провалено ${failed} из ${passed + failed}` : `Все ${passed} проверок пройдены`;
