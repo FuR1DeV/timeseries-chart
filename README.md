@@ -11,7 +11,7 @@
 ## Быстрый старт
 
 ```bash
-git clone <repo-url> timeseries-chart
+git clone https://github.com/FuR1DeV/timeseries-chart.git
 cd timeseries-chart
 npm install      # ставит только vite (dev-сервер)
 npm run dev      # http://localhost:5173 — демо с данными из референса
