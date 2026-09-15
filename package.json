@@ -1,0 +1,38 @@
+{
+  "name": "timeseries-chart",
+  "version": "1.0.0",
+  "description": "Lightweight zero-dependency SVG chart: 4 time-series drawn as area, spline, line and bar with a shared tooltip (Highcharts-like look & behaviour)",
+  "type": "module",
+  "main": "src/index.js",
+  "module": "src/index.js",
+  "types": "src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "serve": "python -m http.server 5173"
+  },
+  "keywords": [
+    "chart",
+    "time-series",
+    "svg",
+    "area",
+    "spline",
+    "line",
+    "bar",
+    "tooltip"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

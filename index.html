@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Time-series chart — area / spline / line / bar</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 32px 24px 48px;
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      font-size: 14px;
+      color: #333;
+      background: #f7f7f9;
+    }
+    h1 { font-size: 20px; margin: 0 0 6px; }
+    p { margin: 0 0 16px; color: #666; }
+    .row {
+      max-width: 720px;
+      padding: 24px 32px;
+      background: #fce0e3;
+      border-radius: 6px;
+      margin-bottom: 28px;
+    }
+    .row h2 { font-size: 14px; margin: 0 0 12px; color: #444; font-weight: 600; }
+    #chart { width: 100%; height: 300px; }
+    #chart-small { width: 295px; height: 149px; }
+    .controls { display: flex; gap: 8px; margin-top: 16px; }
+    button {
+      padding: 6px 12px;
+      font: inherit;
+      font-size: 13px;
+      border: 1px solid #c8c8d0;
+      border-radius: 4px;
+      background: #fff;
+      cursor: pointer;
+    }
+    button:hover { background: #f2f2f6; }
+  </style>
+</head>
+<body>
+  <h1>Time-series chart</h1>
+  <p>4 последовательности — area, bar, spline, line — с общим тултипом. Наведите курсор на график.</p>
+
+  <div class="row">
+    <h2>Полноразмерный вариант</h2>
+    <div id="chart"></div>
+    <div class="controls">
+      <button id="randomize" type="button">Случайные данные</button>
+      <button id="reset" type="button">Данные из референса</button>
+    </div>
+  </div>
+
+  <div class="row">
+    <h2>Размер как в референсе (295×149)</h2>
+    <div id="chart-small"></div>
+  </div>
+
+  <script type="module" src="./demo/main.js"></script>
+</body>
+</html>
